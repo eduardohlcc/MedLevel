@@ -1,0 +1,195 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  STUDENT
+  ADMIN
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum QuestionStatus {
+  DRAFT
+  REVIEWED
+  PUBLISHED
+}
+
+enum ExamMode {
+  ENAMED_OFFICIAL
+  CUSTOM
+}
+
+enum ExamStatus {
+  IN_PROGRESS
+  FINISHED
+  EXPIRED
+}
+
+model User {
+  id              String         @id @default(uuid())
+  email           String         @unique
+  name            String
+  passwordHash    String
+  role            Role           @default(STUDENT)
+  targetExamDate  DateTime?
+  weeklyHoursGoal Int?           @default(15)
+  termsAcceptedAt DateTime       @default(now())
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  attempts        Attempt[]
+  examSessions    ExamSession[]
+  reviewCards     ReviewCard[]
+  studyPlans      StudyPlan[]
+
+  @@map("users")
+}
+
+model Topic {
+  id          String     @id @default(uuid())
+  name        String
+  slug        String     @unique
+  description String?
+  parentId    String?
+  parent      Topic?     @relation("TopicHierarchy", fields: [parentId], references: [id])
+  children    Topic[]    @relation("TopicHierarchy")
+  questions   Question[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("topics")
+}
+
+model Question {
+  id          String                 @id @default(uuid())
+  code        String                 @unique
+  stem        String                 @db.Text
+  area        String                 // e.g. "Clínica Médica", "Cirurgia", "Pediatria", etc.
+  difficulty  Difficulty             @default(MEDIUM)
+  year        Int                    @default(2025)
+  source      String                 @default("Simulado MedLevel (Demonstração)")
+  status      QuestionStatus         @default(PUBLISHED)
+  topicId     String
+  topic       Topic                  @relation(fields: [topicId], references: [id])
+  
+  alternatives Alternative[]
+  attempts    Attempt[]
+  examQuestions ExamSessionQuestion[]
+  reviewCards ReviewCard[]
+
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([area])
+  @@index([difficulty])
+  @@index([status])
+  @@map("questions")
+}
+
+model Alternative {
+  id          String   @id @default(uuid())
+  letter      String   // A, B, C, D
+  text        String   @db.Text
+  isCorrect   Boolean  @default(false)
+  explanation String   @db.Text
+  questionId  String
+  question    Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([questionId, letter])
+  @@map("alternatives")
+}
+
+model Attempt {
+  id                    String   @id @default(uuid())
+  userId                String
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId            String
+  question              Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  selectedAlternativeId String
+  isCorrect             Boolean
+  durationSeconds       Int      @default(0)
+  createdAt             DateTime @default(now())
+
+  @@index([userId, isCorrect])
+  @@map("attempts")
+}
+
+model ExamSession {
+  id                   String                @id @default(uuid())
+  userId               String
+  user                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode                 ExamMode              @default(ENAMED_OFFICIAL)
+  status               ExamStatus            @default(IN_PROGRESS)
+  totalQuestions       Int                   @default(100)
+  durationMinutes      Int                   @default(300) // 5 hours
+  scorePercentage      Float?
+  correctCount         Int?
+  startedAt            DateTime              @default(now())
+  finishedAt           DateTime?
+  
+  questions            ExamSessionQuestion[]
+
+  @@map("exam_sessions")
+}
+
+model ExamSessionQuestion {
+  id                    String      @id @default(uuid())
+  examSessionId         String
+  examSession           ExamSession @relation(fields: [examSessionId], references: [id], onDelete: Cascade)
+  questionId            String
+  question              Question    @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  orderIndex            Int
+  selectedAlternativeId String?
+  flaggedForReview      Boolean     @default(false)
+  isCorrect             Boolean?
+
+  @@unique([examSessionId, orderIndex])
+  @@map("exam_session_questions")
+}
+
+model ReviewCard {
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  questionId     String
+  question       Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  
+  // SM-2 Spaced Repetition Fields
+  easeFactor     Float     @default(2.5)
+  interval       Int       @default(1)
+  repetitions    Int       @default(0)
+  dueDate        DateTime  @default(now())
+  lastReviewedAt DateTime?
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@unique([userId, questionId])
+  @@index([userId, dueDate])
+  @@map("review_cards")
+}
+
+model StudyPlan {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetExamDate  DateTime
+  weeklyHoursGoal Int      @default(15)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("study_plans")
+}
