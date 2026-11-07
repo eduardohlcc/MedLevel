@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;0,8..60,700;1,8..60,400&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Palette Editorial Contida (Light Mode) */
+    --background: #F6F4EF;
+    --foreground: #1C1F1D;
+    
+    --surface: #FFFFFF;
+    --surface-subtle: #EFECE4;
+    
+    --primary: #0F4C4A;
+    --primary-foreground: #FFFFFF;
+    --primary-hover: #0A3635;
+    
+    --accent: #B4691F;
+    --accent-foreground: #FFFFFF;
+    --accent-subtle: #FDF5ED;
+    
+    --border: #D9D5CB;
+    
+    --muted: #E8E5DD;
+    --muted-foreground: #606662;
+    
+    --success: #2F7D4F;
+    --success-foreground: #FFFFFF;
+    --success-subtle: #EAF5EE;
+    
+    --destructive: #B23A3A;
+    --destructive-foreground: #FFFFFF;
+    --destructive-subtle: #FBEBEB;
+    
+    --warning: #B4691F;
+    --warning-foreground: #FFFFFF;
+    --warning-subtle: #FEF7EE;
+  }
+
+  .dark {
+    /* Full Dark Mode Derivado dos Mesmos Tokens */
+    --background: #141615;
+    --foreground: #EBEAE5;
+    
+    --surface: #1A1D1C;
+    --surface-subtle: #232725;
+    
+    --primary: #2A7C79;
+    --primary-foreground: #0C1E1D;
+    --primary-hover: #359693;
+    
+    --accent: #D98A3C;
+    --accent-foreground: #1A1105;
+    --accent-subtle: #2B1D0E;
+    
+    --border: #2E3331;
+    
+    --muted: #282C2A;
+    --muted-foreground: #9DA3A0;
+    
+    --success: #42A86C;
+    --success-foreground: #081D11;
+    --success-subtle: #132B1C;
+    
+    --destructive: #D95353;
+    --destructive-foreground: #2B0B0B;
+    --destructive-subtle: #301414;
+    
+    --warning: #D98A3C;
+    --warning-foreground: #1A1105;
+    --warning-subtle: #2B1D0E;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    min-height: 100vh;
+  }
+
+  /* Accessible Visible Focus Ring (WCAG AA) */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary ring-offset-2 ring-offset-background;
+  }
+}
+
+/* Reduced Motion Respect */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
