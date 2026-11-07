@@ -1,0 +1,666 @@
+openapi: 3.0.3
+info:
+  title: MedLevel API
+  version: 1.0.0
+  description: >
+    API REST para a plataforma de estudos e simulados médicos MedLevel,
+    voltada à preparação para o ENAMED (Exame Nacional de Avaliação da Formação Médica).
+servers:
+  - url: http://localhost:4000/api/v1
+    description: Servidor de desenvolvimento local
+
+tags:
+  - name: Auth
+    description: Endpoints de autenticação, registro e recuperação de credenciais
+  - name: Questions
+    description: Banco de questões, filtros e busca detalhada
+  - name: Attempts
+    description: Resolução de questões individuais e feedback imediato
+  - name: Exams
+    description: Sessões de simulados (ENAMED 100 questões e modo personalizado)
+  - name: Reviews
+    description: Caderno de erros e repetição espaçada (Algoritmo SM-2)
+  - name: Dashboard
+    description: Estatísticas de evolução, acertos por grande área e métricas de estudo
+  - name: StudyPlan
+    description: Planejamento de estudos e metas diárias
+  - name: Admin
+    description: Gestão, moderação e importação de questões em lote
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Cadastrar novo estudante
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password, termsAccepted]
+              properties:
+                name: { type: string, example: "Dra. Camila Rocha" }
+                email: { type: string, format: email, example: "camila@exemplo.med.br" }
+                password: { type: string, format: password, example: "SenhaForte#2026" }
+                targetExamDate: { type: string, format: date, example: "2026-10-25" }
+                weeklyHoursGoal: { type: integer, example: 20 }
+                termsAccepted: { type: boolean, example: true }
+      responses:
+        201:
+          description: Cadastro realizado com sucesso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        400:
+          description: Dados inválidos ou e-mail já existente
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Autenticação de usuário por e-mail e senha
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, example: "camila@exemplo.med.br" }
+                password: { type: string, format: password, example: "SenhaForte#2026" }
+      responses:
+        200:
+          description: Login efetuado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        401:
+          description: Credenciais incorretas
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Renovar tokens de acesso via refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        200:
+          description: Novo par de tokens gerado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokensResponse'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Solicitar recuperação de senha (simulado)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        200:
+          description: Instruções de recuperação despachadas com sucesso
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Dados do perfil autenticado
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+
+  /auth/account:
+    delete:
+      tags: [Auth]
+      summary: Excluir permanentemente conta de usuário (LGPD)
+      security: [{ bearerAuth: [] }]
+      responses:
+        204:
+          description: Conta e dados excluídos com sucesso
+
+  /questions:
+    get:
+      tags: [Questions]
+      summary: Listar banco de questões com filtros e busca
+      parameters:
+        - name: area
+          in: query
+          schema: { type: string }
+        - name: topicId
+          in: query
+          schema: { type: string }
+        - name: difficulty
+          in: query
+          schema: { type: string, enum: [EASY, MEDIUM, HARD] }
+        - name: year
+          in: query
+          schema: { type: integer }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/QuestionSummary'
+                  total: { type: integer }
+                  page: { type: integer }
+                  totalPages: { type: integer }
+
+  /questions/{id}:
+    get:
+      tags: [Questions]
+      summary: Obter questão por ID com suas alternativas
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionDetail'
+
+  /questions/{id}/attempt:
+    post:
+      tags: [Attempts]
+      summary: Responder questão avulsa e obter gabarito comentado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [alternativeId, durationSeconds]
+              properties:
+                alternativeId: { type: string }
+                durationSeconds: { type: integer }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttemptResult'
+
+  /exams:
+    post:
+      tags: [Exams]
+      summary: Iniciar nova sessão de simulado
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mode]
+              properties:
+                mode: { type: string, enum: [ENAMED_OFFICIAL, CUSTOM] }
+                customQuestionCount: { type: integer, default: 100 }
+                selectedAreas:
+                  type: array
+                  items: { type: string }
+      responses:
+        201:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamSessionDetail'
+
+  /exams/{id}:
+    get:
+      tags: [Exams]
+      summary: Carregar estado da sessão de simulado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamSessionDetail'
+
+  /exams/{id}/answers:
+    post:
+      tags: [Exams]
+      summary: Salvar ou alterar resposta de uma questão no simulado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [questionId, alternativeId]
+              properties:
+                questionId: { type: string }
+                alternativeId: { type: string }
+                flaggedForReview: { type: boolean }
+      responses:
+        200:
+          description: Resposta registrada temporariamente
+
+  /exams/{id}/finish:
+    post:
+      tags: [Exams]
+      summary: Finalizar prova de simulado e computar nota
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamReport'
+
+  /exams/{id}/report:
+    get:
+      tags: [Exams]
+      summary: Relatório consolidado de desempenho do simulado
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExamReport'
+
+  /reviews/today:
+    get:
+      tags: [Reviews]
+      summary: Listar questões pendentes para revisão no dia atual (SM-2)
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ReviewCardItem'
+
+  /reviews/{id}/grade:
+    post:
+      tags: [Reviews]
+      summary: Avaliar retenção da revisão (escala SM-2 de 0 a 5)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [grade]
+              properties:
+                grade:
+                  type: integer
+                  minimum: 0
+                  maximum: 5
+                  description: "0 = esquecimento total, 5 = retenção perfeita"
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewCardItem'
+
+  /dashboard/stats:
+    get:
+      tags: [Dashboard]
+      summary: Resumo estatístico de desempenho e evolução do estudante
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+
+  /study-plan:
+    get:
+      tags: [StudyPlan]
+      summary: Obter plano de estudos atual
+      security: [{ bearerAuth: [] }]
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyPlanResponse'
+    post:
+      tags: [StudyPlan]
+      summary: Configurar metas e data do ENAMED
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targetExamDate, weeklyHoursGoal]
+              properties:
+                targetExamDate: { type: string, format: date }
+                weeklyHoursGoal: { type: integer }
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StudyPlanResponse'
+
+  /admin/questions:
+    post:
+      tags: [Admin]
+      summary: Cadastrar nova questão médica
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionDto'
+      responses:
+        201:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionDetail'
+
+  /admin/questions/import:
+    post:
+      tags: [Admin]
+      summary: Importar lote de questões via JSON
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/CreateQuestionDto'
+      responses:
+        201:
+          description: Questões importadas com sucesso
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserProfile:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { type: string, enum: [STUDENT, ADMIN] }
+        targetExamDate: { type: string, nullable: true }
+        weeklyHoursGoal: { type: integer, nullable: true }
+
+    TokensResponse:
+      type: object
+      properties:
+        accessToken: { type: string }
+        refreshToken: { type: string }
+
+    AuthResponse:
+      type: object
+      properties:
+        user: { $ref: '#/components/schemas/UserProfile' }
+        tokens: { $ref: '#/components/schemas/TokensResponse' }
+
+    AlternativeDto:
+      type: object
+      properties:
+        id: { type: string }
+        letter: { type: string, example: "A" }
+        text: { type: string }
+        isCorrect: { type: boolean }
+        explanation: { type: string }
+
+    QuestionSummary:
+      type: object
+      properties:
+        id: { type: string }
+        code: { type: string, example: "MED-001" }
+        stem: { type: string }
+        area: { type: string }
+        topicName: { type: string }
+        difficulty: { type: string, enum: [EASY, MEDIUM, HARD] }
+        year: { type: integer }
+        source: { type: string }
+        status: { type: string, enum: [DRAFT, REVIEWED, PUBLISHED] }
+
+    QuestionDetail:
+      type: object
+      properties:
+        id: { type: string }
+        code: { type: string }
+        stem: { type: string }
+        area: { type: string }
+        topicName: { type: string }
+        difficulty: { type: string }
+        year: { type: integer }
+        source: { type: string }
+        status: { type: string }
+        disclaimer: { type: string }
+        alternatives:
+          type: array
+          items:
+            $ref: '#/components/schemas/AlternativeDto'
+
+    AttemptResult:
+      type: object
+      properties:
+        id: { type: string }
+        questionId: { type: string }
+        isCorrect: { type: boolean }
+        selectedAlternativeId: { type: string }
+        correctAlternativeId: { type: string }
+        explanation: { type: string }
+        durationSeconds: { type: integer }
+        inReviewDeck: { type: boolean }
+
+    ExamSessionDetail:
+      type: object
+      properties:
+        id: { type: string }
+        mode: { type: string }
+        totalQuestions: { type: integer }
+        durationMinutes: { type: integer }
+        startedAt: { type: string, format: date-time }
+        remainingSeconds: { type: integer }
+        status: { type: string, enum: [IN_PROGRESS, FINISHED, EXPIRED] }
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionSummary'
+        answers:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              alternativeId: { type: string }
+              flaggedForReview: { type: boolean }
+
+    ExamReport:
+      type: object
+      properties:
+        id: { type: string }
+        mode: { type: string }
+        totalQuestions: { type: integer }
+        correctCount: { type: integer }
+        scorePercentage: { type: number }
+        totalDurationSeconds: { type: integer }
+        areaBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              area: { type: string }
+              total: { type: integer }
+              correct: { type: integer }
+              percentage: { type: number }
+
+    ReviewCardItem:
+      type: object
+      properties:
+        id: { type: string }
+        questionId: { type: string }
+        question:
+          $ref: '#/components/schemas/QuestionDetail'
+        repetitions: { type: integer }
+        interval: { type: integer }
+        easeFactor: { type: number }
+        dueDate: { type: string, format: date }
+
+    DashboardStats:
+      type: object
+      properties:
+        totalAttempts: { type: integer }
+        overallAccuracy: { type: number }
+        averageTimeSeconds: { type: integer }
+        completedExamsCount: { type: integer }
+        activeReviewCardsCount: { type: integer }
+        areaAccuracy:
+          type: array
+          items:
+            type: object
+            properties:
+              area: { type: string }
+              accuracy: { type: number }
+              attempts: { type: integer }
+        weeklyEvolution:
+          type: array
+          items:
+            type: object
+            properties:
+              week: { type: string }
+              accuracy: { type: number }
+              questionsDone: { type: integer }
+        weakTopics:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              area: { type: string }
+              accuracy: { type: number }
+        strongTopics:
+          type: array
+          items:
+            type: object
+            properties:
+              name: { type: string }
+              area: { type: string }
+              accuracy: { type: number }
+
+    StudyPlanResponse:
+      type: object
+      properties:
+        targetExamDate: { type: string }
+        daysRemaining: { type: integer }
+        weeklyHoursGoal: { type: integer }
+        dailySuggestedTopics:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              topicName: { type: string }
+              area: { type: string }
+              reason: { type: string }
+              recommendedQuestions: { type: integer }
+
+    CreateQuestionDto:
+      type: object
+      required: [code, stem, area, topicName, difficulty, year, source, alternatives]
+      properties:
+        code: { type: string }
+        stem: { type: string }
+        area: { type: string }
+        topicName: { type: string }
+        difficulty: { type: string, enum: [EASY, MEDIUM, HARD] }
+        year: { type: integer }
+        source: { type: string }
+        status: { type: string, enum: [DRAFT, REVIEWED, PUBLISHED], default: PUBLISHED }
+        alternatives:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            type: object
+            required: [letter, text, isCorrect, explanation]
+            properties:
+              letter: { type: string }
+              text: { type: string }
+              isCorrect: { type: boolean }
+              explanation: { type: string }
