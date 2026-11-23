@@ -21,7 +21,7 @@ O MedLevel reúne em um ambiente editorial, sóbrio e focado:
 - **Plano de Estudos**: Cronograma diário sugerido a partir da data informada da prova e horas de estudo semanais.
 - **Área Administrativa**: Moderação, cadastro e importação em lote (JSON) de novas questões com status de rascunho, revisada e publicada.
 
----
+--------
 
 ## 🏛️ Arquitetura e Stack Tecnológica
 
