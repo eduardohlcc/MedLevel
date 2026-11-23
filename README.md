@@ -126,7 +126,9 @@ O frontend não necessita do backend nem do banco de dados para ser desenvolvido
 
 Consulte o guia completo em [docs/CONTRIBUINDO.md](docs/CONTRIBUINDO.md) para:
 - Padrão de branches (`main`, `develop`, `feat/*`);
+
 - Padrão de Conventional Commits (`feat:`, `fix:`, `docs:`, etc.);
+
 - Como abrir Pull Requests e checklist de revisão de código.
 
 ---
