@@ -2,7 +2,7 @@
 
 > Plataforma web de alta performance para estudantes de Medicina no Brasil se prepararem para o **ENAMED** (*Exame Nacional de Avaliação da Formação Médica*).
 
----
+----
 
 > [!IMPORTANT]
 > **Aviso Obrigatório**: Material de estudo para demonstração. Não substitui diretrizes oficiais nem orientação clínica médica.
